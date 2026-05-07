@@ -3,6 +3,7 @@ package com.generalbytes.bitrafael.client;
 import jakarta.ws.rs.HeaderParam;
 import org.junit.Test;
 import si.mazi.rescu.ClientConfig;
+import si.mazi.rescu.ParamsDigest;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -27,7 +28,7 @@ public class ClientConfigFactoryTest {
     public void testCreate_supplierReturningNull() {
         ClientConfig config = ClientConfigFactory.create(() -> null);
 
-        assertEquals("", getAuthorizationValue(config));
+        assertNull(getAuthorizationValue(config));
     }
 
     @Test
@@ -43,7 +44,8 @@ public class ClientConfigFactoryTest {
     }
 
     private String getAuthorizationValue(ClientConfig config) {
-        return config.getDefaultParamsMap().get(HeaderParam.class).getParamValue("Authorization").toString();
+        ParamsDigest digest = (ParamsDigest) config.getDefaultParamsMap().get(HeaderParam.class).getParamValue("Authorization");
+        return digest.digestParams(null);
     }
 
 }
