@@ -29,6 +29,7 @@ import com.generalbytes.bitrafael.tools.api.wallet.ISignature;
 import com.generalbytes.bitrafael.tools.wallet.WalletTools;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.Utils;
+import si.mazi.rescu.ClientConfig;
 import si.mazi.rescu.RestProxyFactory;
 
 import java.math.BigDecimal;
@@ -36,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 public class Client implements IClient {
 
@@ -53,14 +55,20 @@ public class Client implements IClient {
     }
 
     public Client(String server, String cryptoCurrency) {
+        this(server, cryptoCurrency, null);
+    }
+
+    public Client(String server, String cryptoCurrency, Supplier<String> apiKeySupplier) {
         this.cryptoCurrency = cryptoCurrency;
-        walletTools = new WalletTools();
+        this.walletTools = new WalletTools();
+
+        ClientConfig clientConfig = ClientConfigFactory.create(apiKeySupplier);
         if (BTC.equalsIgnoreCase(cryptoCurrency)) {
-            api = RestProxyFactory.createProxy(IBitrafaelBitcoinAPI.class, server + "/api");
+            api = RestProxyFactory.createProxy(IBitrafaelBitcoinAPI.class, server + "/api", clientConfig);
         } else if (LTC.equalsIgnoreCase(cryptoCurrency)) {
-            api = RestProxyFactory.createProxy(IBitrafaelLitecoinAPI.class, server + "/api");
+            api = RestProxyFactory.createProxy(IBitrafaelLitecoinAPI.class, server + "/api", clientConfig);
         } else if (DASH.equalsIgnoreCase(cryptoCurrency)) {
-            api = RestProxyFactory.createProxy(IBitrafaelDashAPI.class, server + "/api");
+            api = RestProxyFactory.createProxy(IBitrafaelDashAPI.class, server + "/api", clientConfig);
         }
     }
 

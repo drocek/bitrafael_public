@@ -22,6 +22,7 @@ import com.generalbytes.bitrafael.server.api.IBitrafaelBitcoinAPI;
 import com.generalbytes.bitrafael.server.api.dto.rest.CurrenciesResponse;
 import com.generalbytes.bitrafael.server.api.dto.rest.QuotesResponse;
 import com.generalbytes.bitrafael.tools.api.currency.IRatesProvider;
+import com.generalbytes.bitrafael.client.ClientConfigFactory;
 import si.mazi.rescu.RestProxyFactory;
 
 import java.math.BigDecimal;
@@ -31,6 +32,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 
 public class CurrencyRateSource implements IRatesProvider {
@@ -45,7 +47,11 @@ public class CurrencyRateSource implements IRatesProvider {
     }
 
     public CurrencyRateSource(String server) {
-        api = RestProxyFactory.createProxy(IBitrafaelBitcoinAPI.class, server + "/api");
+        this(server, null);
+    }
+
+    public CurrencyRateSource(String server, Supplier<String> apiKeySupplier) {
+        api = RestProxyFactory.createProxy(IBitrafaelBitcoinAPI.class, server + "/api", ClientConfigFactory.create(apiKeySupplier));
     }
 
     private void initializeIfNeeded() {
