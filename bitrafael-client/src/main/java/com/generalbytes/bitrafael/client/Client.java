@@ -15,8 +15,6 @@
  * Web      :  http://www.generalbytes.com
  *
  ************************************************************************************/
-
-
 package com.generalbytes.bitrafael.client;
 
 import com.generalbytes.bitrafael.server.api.IBitrafaelAPI;
@@ -31,6 +29,7 @@ import com.generalbytes.bitrafael.tools.api.wallet.ISignature;
 import com.generalbytes.bitrafael.tools.wallet.WalletTools;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.Utils;
+import si.mazi.rescu.ClientConfig;
 import si.mazi.rescu.RestProxyFactory;
 
 import java.math.BigDecimal;
@@ -38,12 +37,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 public class Client implements IClient {
-    private String server;
-    private String cryptoCurrency;
+
+    private final String cryptoCurrency;
     private IBitrafaelAPI api;
-    private IWalletTools walletTools;
+    private final IWalletTools walletTools;
     private static final BigDecimal ONE_BTC_IN_SATOSHIS = new BigDecimal("100000000");
 
     public Client() {
@@ -55,15 +55,20 @@ public class Client implements IClient {
     }
 
     public Client(String server, String cryptoCurrency) {
-        this.server = server;
+        this(server, cryptoCurrency, null);
+    }
+
+    public Client(String server, String cryptoCurrency, Supplier<String> apiKeySupplier) {
         this.cryptoCurrency = cryptoCurrency;
-        walletTools = new WalletTools();
+        this.walletTools = new WalletTools();
+
+        ClientConfig clientConfig = ClientConfigFactory.create(apiKeySupplier);
         if (BTC.equalsIgnoreCase(cryptoCurrency)) {
-            api = RestProxyFactory.createProxy(IBitrafaelBitcoinAPI.class, server + "/api");
-        }else if (LTC.equalsIgnoreCase(cryptoCurrency)) {
-            api = RestProxyFactory.createProxy(IBitrafaelLitecoinAPI.class, server + "/api");
-        }else if (DASH.equalsIgnoreCase(cryptoCurrency)) {
-            api = RestProxyFactory.createProxy(IBitrafaelDashAPI.class, server + "/api");
+            api = RestProxyFactory.createProxy(IBitrafaelBitcoinAPI.class, server + "/api", clientConfig);
+        } else if (LTC.equalsIgnoreCase(cryptoCurrency)) {
+            api = RestProxyFactory.createProxy(IBitrafaelLitecoinAPI.class, server + "/api", clientConfig);
+        } else if (DASH.equalsIgnoreCase(cryptoCurrency)) {
+            api = RestProxyFactory.createProxy(IBitrafaelDashAPI.class, server + "/api", clientConfig);
         }
     }
 
@@ -74,9 +79,9 @@ public class Client implements IClient {
     public static long bigDecimalToSatoshis(BigDecimal amount) {
         if (amount.compareTo(FEE_LOW) == 0) {
             return -1;
-        }else if (amount.compareTo(FEE_MEDIUM) == 0) {
+        } else if (amount.compareTo(FEE_MEDIUM) == 0) {
             return -2;
-        }else if (amount.compareTo(FEE_HIGH) == 0) {
+        } else if (amount.compareTo(FEE_HIGH) == 0) {
             return -3;
         }
         return amount.multiply(ONE_BTC_IN_SATOSHIS).longValueExact();
@@ -85,7 +90,7 @@ public class Client implements IClient {
     public static BigDecimal calculateMiningFee(TxInfo txInfo) {
         final List<InputInfo> inputInfos = txInfo.getInputInfos();
         final List<OutputInfo> outputInfos = txInfo.getOutputInfos();
-        long input  = 0;
+        long input = 0;
         long output = 0;
         for (int i = 0; i < inputInfos.size(); i++) {
             InputInfo inputInfo = inputInfos.get(i);
@@ -94,12 +99,10 @@ public class Client implements IClient {
 
         for (int i = 0; i < outputInfos.size(); i++) {
             OutputInfo outputInfo = outputInfos.get(i);
-            output+=outputInfo.getValue();
+            output += outputInfo.getValue();
         }
         return satoshisToBigDecimal(input - output);
     }
-
-
 
     @Override
     public BigDecimal getAddressBalance(String address) {
@@ -141,7 +144,7 @@ public class Client implements IClient {
     }
 
     @Override
-    public long getTransactionHeight(String txHash){
+    public long getTransactionHeight(String txHash) {
         try {
             final TxInfoResponse response = api.getTransactionInfo(txHash);
             if (response != null && response.isSuccess() && response.getData() != null) {
@@ -154,7 +157,7 @@ public class Client implements IClient {
     }
 
     @Override
-    public long getTransactionConfirmations(String txHash){
+    public long getTransactionConfirmations(String txHash) {
         try {
             final TxInfoResponse response = api.getTransactionInfo(txHash);
             if (response != null && response.isSuccess() && response.getData() != null) {
@@ -221,7 +224,7 @@ public class Client implements IClient {
     }
 
     @Override
-    public TxInfo getAddressLastTransactionInfo(String address){
+    public TxInfo getAddressLastTransactionInfo(String address) {
         try {
             final TxInfoResponse response = api.getAddressLastTransactionInfo(address);
             if (response != null && response.isSuccess() && response.getData() != null) {
@@ -334,7 +337,6 @@ public class Client implements IClient {
         return -1;
     }
 
-
     @Override
     public String send(String fromPrivateKey, BigDecimal amount, String toAddress) {
         return send(fromPrivateKey, amount, toAddress, null);
@@ -342,7 +344,7 @@ public class Client implements IClient {
 
     @Override
     public String send(String fromPrivateKey, BigDecimal amount, String toAddress, BigDecimal fee) {
-        return send(new String[]{fromPrivateKey}, new BigDecimal[] {amount}, new String[]{toAddress}, new BigDecimal[] {amount}, fee);
+        return send(new String[]{fromPrivateKey}, new BigDecimal[]{amount}, new String[]{toAddress}, new BigDecimal[]{amount}, fee);
     }
 
     @Override
@@ -397,17 +399,16 @@ public class Client implements IClient {
                     return txReceiptResponse.getData().getTxHash();
                 }
             }
-        }catch (Throwable t) {
+        } catch (Throwable t) {
             t.printStackTrace();
         }
         return null;
     }
 
-
     @Override
     public BigDecimal convertAmount(BigDecimal fromAmount, String fromCurrency, String toCurrency) {
-        final ArrayList<AmountsPair> amountsPairs = new ArrayList<AmountsPair>();
-        amountsPairs.add(new AmountsPair(fromAmount,fromCurrency,null,toCurrency));
+        final ArrayList<AmountsPair> amountsPairs = new ArrayList<>();
+        amountsPairs.add(new AmountsPair(fromAmount, fromCurrency, null, toCurrency));
         final List<AmountsPair> result = convertAmounts(amountsPairs);
         if (result != null) {
             return result.get(0).getToAmount();
@@ -422,12 +423,11 @@ public class Client implements IClient {
             if (res.isSuccess()) {
                 return res.getData();
             }
-        }catch (Throwable t) {
+        } catch (Throwable t) {
             t.printStackTrace();
         }
         return null;
     }
-
 
     public static final String formatAmount(long amountInSatoshis, String currency, long time) {
         if ( currency == null || IClient.BTC.equalsIgnoreCase(currency) || IClient.LTC.equalsIgnoreCase(currency)) {

@@ -22,6 +22,7 @@ import com.generalbytes.bitrafael.server.api.IBitrafaelBitcoinAPI;
 import com.generalbytes.bitrafael.server.api.dto.rest.CurrenciesResponse;
 import com.generalbytes.bitrafael.server.api.dto.rest.QuotesResponse;
 import com.generalbytes.bitrafael.tools.api.currency.IRatesProvider;
+import com.generalbytes.bitrafael.client.ClientConfigFactory;
 import si.mazi.rescu.RestProxyFactory;
 
 import java.math.BigDecimal;
@@ -31,24 +32,26 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 
 public class CurrencyRateSource implements IRatesProvider {
-    private String server;
-    private IBitrafaelAPI api;
+
+    private final IBitrafaelAPI api;
     private Set<String> fiatCurrenciesSupported;
     private static final String LOCK = Class.class.getName().intern();
-    private Map<String,QuotesResponse> cache = new ConcurrentHashMap<String,QuotesResponse>();
-    private DateTimeFormatter df = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-
+    private final Map<String, QuotesResponse> cache = new ConcurrentHashMap<>();
 
     public CurrencyRateSource() {
         this("https://coin.cz");
     }
 
     public CurrencyRateSource(String server) {
-        this.server = server;
-        api = RestProxyFactory.createProxy(IBitrafaelBitcoinAPI.class, server + "/api");
+        this(server, null);
+    }
+
+    public CurrencyRateSource(String server, Supplier<String> apiKeySupplier) {
+        api = RestProxyFactory.createProxy(IBitrafaelBitcoinAPI.class, server + "/api", ClientConfigFactory.create(apiKeySupplier));
     }
 
     private void initializeIfNeeded() {
@@ -56,7 +59,7 @@ public class CurrencyRateSource implements IRatesProvider {
             if (fiatCurrenciesSupported == null) {
                 final CurrenciesResponse currencies = api.getCurrencies();
                 if (currencies != null && currencies.isSuccess()) {
-                    fiatCurrenciesSupported = new TreeSet<String>(currencies.getCurrencies().keySet());
+                    fiatCurrenciesSupported = new TreeSet<>(currencies.getCurrencies().keySet());
                 }
             }
         }
@@ -68,13 +71,11 @@ public class CurrencyRateSource implements IRatesProvider {
         return fiatCurrenciesSupported;
     }
 
-
     @Override
     public Set<String> getFiatCurrenciesTo() {
         initializeIfNeeded();
         return fiatCurrenciesSupported;
     }
-
 
     @Override
     public BigDecimal getRate(String fromCurrency, String toCurrency) {
@@ -99,7 +100,7 @@ public class CurrencyRateSource implements IRatesProvider {
         if (quotes != null && quotes.isSuccess()) {
             quotes.setTimestamp(System.currentTimeMillis());
             cache.put(key, quotes);
-            return quotes.getQuotes().get(fromCurrency+toCurrency);
+            return quotes.getQuotes().get(fromCurrency + toCurrency);
         }
         return null;
     }
@@ -124,34 +125,13 @@ public class CurrencyRateSource implements IRatesProvider {
             }
         }
 
-
         final QuotesResponse quotes = api.getQuotesHistorical(fromCurrency, date.format(df));
         if (quotes != null && quotes.isSuccess()) {
             quotes.setTimestamp(System.currentTimeMillis());
             cache.put(key, quotes);
-            return quotes.getQuotes().get(fromCurrency+toCurrency);
+            return quotes.getQuotes().get(fromCurrency + toCurrency);
         }
         return null;
     }
 
-    //    public static void main(String[] args) {
-//        System.setProperty("org.slf4j.simpleLogger.log.si.mazi.rescu","trace");
-//
-//        CurrencyRateSource r = new CurrencyRateSource();
-//        final Set<String> fiatCurrenciesFrom = r.getFiatCurrenciesFrom();
-//        for (String s : fiatCurrenciesFrom) {
-//            System.out.println("s = " + s);
-//        }
-//
-//        BigDecimal rate = r.getRate("USD","CZK");
-//        try {
-//            Thread.sleep(60 * 1000);
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
-//        System.out.println("rate = " + rate);
-//
-//        rate = r.getRate("USD","EUR");
-//        System.out.println("rate = " + rate);
-//    }
 }
